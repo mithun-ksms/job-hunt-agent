@@ -192,7 +192,7 @@ if search_button:
     genai.configure(api_key=gemini_key)
 
     model = genai.GenerativeModel(
-        "gemini-2.0-flash"
+        "gemini-3.5-flash"
     )
 
     # -------------------------
