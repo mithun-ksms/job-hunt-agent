@@ -209,7 +209,7 @@ if search_button:
 
     # start Gemini
     genai.configure(api_key=gemini_key)
-    model = genai.GenerativeModel("gemini-3.5-flash-latest")
+    model = genai.GenerativeModel("gemini-3.5-flash")
 
     # ---- STEP 1: READ CV ----
 
