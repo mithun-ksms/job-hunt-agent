@@ -15,172 +15,180 @@ st.set_page_config(
 
 st.title("🤖 AI Job Search Agent")
 
-st.write(
-    "Upload your CV, add your skills, "
-    "and find graduate jobs that match you."
-)
+st.write("Upload your CV and find jobs that match your skills.")
 
 # -------------------------
-# API KEYS FROM SECRETS
+# API KEYS
 # -------------------------
 
+# read keys from streamlit secrets (safe - never shown to users)
 serper_key = st.secrets["SERPER_KEY"]
 gemini_key = st.secrets["GEMINI_KEY"]
 
 # -------------------------
-# SIDEBAR
+# SIDEBAR INPUTS
 # -------------------------
 
 st.sidebar.header("🎯 Job Search")
 
-job_title = st.sidebar.text_input(
-    "Job title",
-    "Data Analyst"
-)
+# text box for job title
+job_title = st.sidebar.text_input("Job title", "Data Analyst")
 
-location = st.sidebar.text_input(
-    "Location",
-    "London"
-)
+# text box for location
+location = st.sidebar.text_input("Location", "London")
 
 st.sidebar.header("📄 Your CV")
 
-# CV upload
-cv_file = st.sidebar.file_uploader(
-    "Upload your CV (PDF)",
-    type="pdf"
-)
+# file upload box - only accepts PDF
+cv_file = st.sidebar.file_uploader("Upload your CV (PDF)", type="pdf")
 
 st.sidebar.header("➕ Extra Skills")
 
+# text area for manual skills
 manual_skills = st.sidebar.text_area(
     "Add extra skills (one per line)",
-    placeholder="python\nsql\npower bi"
+    "python\nsql\npower bi\ndata analysis\nanalytics\ngraduate"
 )
 
-search_button = st.sidebar.button(
-    "🔍 Find My Jobs"
-)
+# search button
+search_button = st.sidebar.button("🔍 Find My Jobs")
 
 # -------------------------
-# READ CV
+# FUNCTION: READ CV
 # -------------------------
 
 def read_cv(cv_file):
 
+    # empty string to store all text
     text = ""
 
+    # open the PDF file
     pdf = pdfplumber.open(cv_file)
 
+    # go through every page one by one
     for page in pdf.pages:
 
+        # extract text from this page
         page_text = page.extract_text()
 
+        # only add if page has text (some pages are blank)
         if page_text:
             text = text + page_text + "\n"
 
+    # close the PDF
     pdf.close()
 
+    # return all the text
     return text
 
 # -------------------------
-# FIND SKILLS IN CV
+# FUNCTION: GET SKILLS FROM CV
 # -------------------------
 
 def get_cv_skills(cv_text, model):
 
+    # ask Gemini to read the CV and list all skills
     prompt = f"""
-    Read this CV and find all the skills.
-    Include programming languages,
-    tools, software and technical skills.
-    Return ONLY skills separated by commas.
-    Example: python, sql, pandas, power bi
+    Read this CV and list all the skills you find.
+    Include programming languages, tools and software.
+    Return ONLY a comma separated list. Nothing else.
+    Example: python, sql, pandas, power bi, machine learning
 
     CV:
     {cv_text}
     """
 
+    # send to Gemini
     response = model.generate_content(prompt)
 
-    skills = response.text.split(",")
+    # split by comma to get a list
+    # e.g. "python, sql, pandas" becomes ["python", "sql", "pandas"]
+    raw_skills = response.text.split(",")
 
-    skills = [
-        skill.strip().lower()
-        for skill in skills
-        if skill.strip()
-    ]
+    # clean each skill - remove spaces, make lowercase
+    skills = []
+    for skill in raw_skills:
+        cleaned = skill.strip().lower()
+        if cleaned:
+            skills.append(cleaned)
 
     return skills
 
 # -------------------------
-# MATCH JOB WITH SKILLS
+# FUNCTION: SCORE A JOB
 # -------------------------
 
-def match_job(title, description, my_skills):
+def score_job(job_title, job_description, user_skills):
 
-    job_text = (title + " " + description).lower()
+    # combine title and description into one text
+    job_text = job_title + " " + job_description
 
-    possible_skills = [
-    # technical skills
-    "python", "sql", "machine learning",
-    "data analysis", "data analytics",
-    "pandas", "numpy", "power bi",
-    "tableau", "excel", "tensorflow",
-    "pytorch", "scikit-learn", "nlp",
-    "streamlit", "plotly", "shap",
-    "random forest", "statistics",
-    "data visualisation", "aws",
-    "azure", "git", "github", "r",
-    
-    # role keywords that appear in snippets
-    "data analyst", "data scientist",
-    "analytical", "analytics", "graduate",
-    "dashboard", "reporting", "insight",
-    "visualisation", "entry level",
-    "degree", "analysis", "modelling"
-]
+    # make lowercase so matching works
+    job_text = job_text.lower()
 
-    # skills mentioned in job
-    job_skills = [
-        skill for skill in possible_skills
-        if skill in job_text
+    # list of keywords to look for in job postings
+    keywords = [
+        "python", "sql", "machine learning",
+        "data analysis", "data analyst",
+        "data analytics", "analytics",
+        "pandas", "numpy", "power bi",
+        "tableau", "excel", "tensorflow",
+        "pytorch", "scikit-learn", "nlp",
+        "streamlit", "plotly", "shap",
+        "statistics", "data visualisation",
+        "aws", "azure", "git", "github",
+        "graduate", "entry level", "degree",
+        "dashboard", "reporting", "insight",
+        "analytical", "analysis", "r"
     ]
 
-    # skills user has that match job
-    matched_skills = [
-        skill for skill in job_skills
-        if skill in my_skills
-    ]
+    # find which keywords appear in this job
+    job_keywords = []
+    for word in keywords:
+        if word in job_text:
+            job_keywords.append(word)
 
-    # calculate score
-    if len(job_skills) > 0:
-        score = round(
-            len(matched_skills) / len(job_skills) * 100
-        )
+    # find which of those keywords the user also has
+    matched = []
+    for word in job_keywords:
+        # check if this keyword is in user skills
+        for user_skill in user_skills:
+            # use 'in' both ways to catch partial matches
+            # e.g. "data analyst" matches "data analysis"
+            if word in user_skill or user_skill in word:
+                matched.append(word)
+                break  # stop checking once we find a match
+
+    # calculate score as a percentage
+    if len(job_keywords) > 0:
+        score = round(len(matched) / len(job_keywords) * 100)
     else:
         score = 0
 
-    return score, matched_skills, job_skills
+    return score, matched, job_keywords
 
 # -------------------------
-# COVER LETTER
+# FUNCTION: WRITE COVER LETTER
 # -------------------------
 
-def make_cover_letter(title, description, cv_text, model):
+def write_cover_letter(job_title, job_description, cv_text, model):
 
+    # ask Gemini to write a cover letter
     prompt = f"""
-    Write a short professional cover letter.
+    Write a short professional cover letter for this job.
 
-    Job: {title}
-    Description: {description}
-    CV: {cv_text[:2000]}
+    Job title: {job_title}
+    Job description: {job_description}
+
+    Use this CV to personalise it:
+    {cv_text[:2000]}
 
     Rules:
-    - 3 short paragraphs
+    - Write exactly 3 short paragraphs
     - Professional but warm tone
-    - Mention relevant projects from the CV
-    - Do not invent information
-    - Make it specific to this job
+    - Mention specific projects from the CV
+    - Do not make up any information
+    - Make it specific to this exact job
     """
 
     response = model.generate_content(prompt)
@@ -191,21 +199,19 @@ def make_cover_letter(title, description, cv_text, model):
 # MAIN PROGRAM
 # -------------------------
 
+# only run when button is clicked
 if search_button:
 
-    # -------------------------
-    # START GEMINI
-    # -------------------------
+    # check API keys exist
+    if not serper_key or not gemini_key:
+        st.error("API keys missing - check Streamlit secrets")
+        st.stop()
 
+    # start Gemini
     genai.configure(api_key=gemini_key)
+    model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-    model = genai.GenerativeModel(
-        "gemini-3.5-flash"
-    )
-
-    # -------------------------
-    # READ CV IF UPLOADED
-    # -------------------------
+    # ---- STEP 1: READ CV ----
 
     cv_text = ""
     cv_skills = []
@@ -214,167 +220,143 @@ if search_button:
 
         st.info("📄 Reading your CV...")
 
+        # extract text from PDF
         cv_text = read_cv(cv_file)
 
+        # ask Gemini to find skills in the CV
         cv_skills = get_cv_skills(cv_text, model)
 
-        st.success(
-            f"✅ CV scanned — "
-            f"found {len(cv_skills)} skills"
-        )
+        st.success(f"✅ CV read — found {len(cv_skills)} skills")
 
     else:
+        st.warning("⚠️ No CV uploaded — using manual skills only")
 
-        st.warning(
-            "⚠️ No CV uploaded — "
-            "using manual skills only"
-        )
+    # ---- STEP 2: COMBINE SKILLS ----
 
-    # -------------------------
-    # COMBINE SKILLS
-    # -------------------------
+    # split manual skills by new line
+    manual_list = []
+    for skill in manual_skills.split("\n"):
+        cleaned = skill.strip().lower()
+        if cleaned:
+            manual_list.append(cleaned)
 
-    manual_list = [
-        skill.strip().lower()
-        for skill in manual_skills.split("\n")
-        if skill.strip()
-    ]
+    # combine CV skills + manual skills
+    all_skills = cv_skills + manual_list
 
-    all_skills = list(set(cv_skills + manual_list))
+    # remove duplicates
+    all_skills = list(set(all_skills))
 
+    # stop if no skills at all
     if not all_skills:
-
-        st.error(
-            "No skills found. "
-            "Upload a CV or add skills manually."
-        )
-
+        st.error("No skills found. Upload a CV or add skills manually.")
         st.stop()
 
-    # show combined skills
-    with st.expander("🧠 Skills detected"):
+    # show all skills found
+    with st.expander("🧠 Your skills detected"):
         st.write(", ".join(all_skills))
 
     st.markdown("---")
 
-    # -------------------------
-    # SEARCH JOBS
-    # -------------------------
+    # ---- STEP 3: SEARCH JOBS ----
 
     st.info("🔍 Searching for jobs...")
 
-    response = requests.post(
-
+    # send search request to Serper
+    search_response = requests.post(
         "https://google.serper.dev/search",
-
         json={
-            "q": (
-                f"{job_title} jobs "
-                f"{location} "
-                f"graduate entry level"
-            ),
+            "q": job_title + " jobs " + location + " graduate entry level",
             "num": 10,
             "gl": "uk"
         },
-
         headers={
             "X-API-KEY": serper_key,
             "Content-Type": "application/json"
         }
     )
 
-    results = response.json()
+    # get the results
+    results = search_response.json()
+
+    # get just the job listings
     jobs = results.get("organic", [])
 
-    # -------------------------
-    # MATCH JOBS
-    # -------------------------
+    # ---- STEP 4: SCORE EACH JOB ----
 
     st.info("📊 Matching jobs to your skills...")
 
+    # empty list to store scored jobs
     job_list = []
 
+    # go through each job
     for job in jobs:
 
+        # get job details
         title = job.get("title", "N/A")
         link = job.get("link", "N/A")
         description = job.get("snippet", "N/A")
 
-        score, matched, job_skills = match_job(
+        # score this job against user skills
+        score, matched, job_keywords = score_job(
             title,
             description,
             all_skills
         )
 
+        # save the job with its score
         job_list.append({
             "title": title,
             "link": link,
             "description": description,
             "score": score,
-            "matched_skills": ", ".join(matched),
-            "job_skills": ", ".join(job_skills)
+            "matched": ", ".join(matched),
+            "job_keywords": ", ".join(job_keywords)
         })
 
+    # turn list into a table
     df_jobs = pd.DataFrame(job_list)
 
-    df_jobs = df_jobs.sort_values(
-        "score",
-        ascending=False
-    ).reset_index(drop=True)
+    # sort by score - best first
+    df_jobs = df_jobs.sort_values("score", ascending=False)
+    df_jobs = df_jobs.reset_index(drop=True)
 
-    # -------------------------
-    # SHOW RESULTS
-    # -------------------------
+    # ---- STEP 5: SHOW RESULTS ----
 
     st.markdown("---")
-    st.subheader(f"🎯 {len(df_jobs)} Jobs Found")
+    st.subheader(f"🎯 {len(df_jobs)} jobs found")
 
+    # show each job
     for i, row in df_jobs.iterrows():
 
-        # colour based on score
-        if row['score'] > 50:
+        # pick emoji based on score
+        if row["score"] > 50:
             emoji = "🟢"
-        elif row['score'] > 20:
+        elif row["score"] > 20:
             emoji = "🟡"
         else:
             emoji = "🔴"
 
+        # show job in expandable section
         with st.expander(
-            f"{emoji} {row['title']} "
-            f"— {row['score']}% match"
+            emoji + " " + row["title"] + " — " + str(row["score"]) + "% match"
         ):
 
-            st.write(
-                f"**Description:** {row['description']}"
-            )
+            st.write("**Description:** " + row["description"])
 
-            st.write(
-                f"**Skills this job wants:** "
-                f"`{row['job_skills']}`"
-            )
+            st.write("**Skills this job wants:** " + row["job_keywords"])
 
-            st.write(
-                f"**Your matching skills:** "
-                f"`{row['matched_skills']}`"
-            )
+            st.write("**Your matching skills:** " + row["matched"])
 
-            st.markdown(
-                f"[View Full Job →]({row['link']})"
-            )
+            st.markdown("[View Full Job →](" + row["link"] + ")")
 
             st.divider()
 
-            # cover letter button
-            if st.button(
-                "✉️ Generate Cover Letter",
-                key=f"btn_{i}"
-            ):
+            # cover letter button for this job
+            if st.button("✉️ Generate Cover Letter", key="btn_" + str(i)):
 
-                with st.spinner(
-                    "✍️ Writing your cover letter..."
-                ):
+                with st.spinner("✍️ Writing your cover letter..."):
 
-                    letter = make_cover_letter(
+                    letter = write_cover_letter(
                         row["title"],
                         row["description"],
                         cv_text,
@@ -382,15 +364,15 @@ if search_button:
                     )
 
                     st.text_area(
-                        "Your Cover Letter:",
+                        "Your cover letter:",
                         letter,
                         height=300,
-                        key=f"letter_{i}"
+                        key="letter_" + str(i)
                     )
 
                     st.download_button(
                         "⬇️ Download Cover Letter",
                         letter,
-                        file_name=f"cover_letter_{i+1}.txt",
-                        key=f"download_{i}"
+                        file_name="cover_letter_" + str(i+1) + ".txt",
+                        key="download_" + str(i)
                     )
