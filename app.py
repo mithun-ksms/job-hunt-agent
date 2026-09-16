@@ -121,16 +121,24 @@ def match_job(title, description, my_skills):
     job_text = (title + " " + description).lower()
 
     possible_skills = [
-        "python", "sql", "machine learning",
-        "data analysis", "data analytics",
-        "pandas", "numpy", "power bi",
-        "tableau", "excel", "tensorflow",
-        "pytorch", "scikit-learn", "nlp",
-        "streamlit", "plotly", "shap",
-        "random forest", "statistics",
-        "data visualisation", "aws",
-        "azure", "git", "github", "r"
-    ]
+    # technical skills
+    "python", "sql", "machine learning",
+    "data analysis", "data analytics",
+    "pandas", "numpy", "power bi",
+    "tableau", "excel", "tensorflow",
+    "pytorch", "scikit-learn", "nlp",
+    "streamlit", "plotly", "shap",
+    "random forest", "statistics",
+    "data visualisation", "aws",
+    "azure", "git", "github", "r",
+    
+    # role keywords that appear in snippets
+    "data analyst", "data scientist",
+    "analytical", "analytics", "graduate",
+    "dashboard", "reporting", "insight",
+    "visualisation", "entry level",
+    "degree", "analysis", "modelling"
+]
 
     # skills mentioned in job
     job_skills = [
