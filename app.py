@@ -1,7 +1,8 @@
+# import libraries
+from google import genai
 import streamlit as st
 import requests
 import pandas as pd
-import google.generativeai as genai
 import pdfplumber
 
 # -------------------------
@@ -18,7 +19,7 @@ st.title("🤖 AI Job Search Agent")
 st.write("Upload your CV and find jobs that match your skills.")
 
 # -------------------------
-# API KEYS
+# API KEYS FROM SECRETS
 # -------------------------
 
 # read keys from streamlit secrets (safe - never shown to users)
@@ -85,7 +86,7 @@ def read_cv(cv_file):
 # FUNCTION: GET SKILLS FROM CV
 # -------------------------
 
-def get_cv_skills(cv_text, model):
+def get_cv_skills(cv_text, client):
 
     # ask Gemini to read the CV and list all skills
     prompt = f"""
@@ -98,8 +99,11 @@ def get_cv_skills(cv_text, model):
     {cv_text}
     """
 
-    # send to Gemini
-    response = model.generate_content(prompt)
+    # send to Gemini using new SDK
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt
+    )
 
     # split by comma to get a list
     # e.g. "python, sql, pandas" becomes ["python", "sql", "pandas"]
@@ -157,7 +161,8 @@ def score_job(job_title, job_description, user_skills):
             # e.g. "data analyst" matches "data analysis"
             if word in user_skill or user_skill in word:
                 matched.append(word)
-                break  # stop checking once we find a match
+                # stop checking once we find a match
+                break
 
     # calculate score as a percentage
     if len(job_keywords) > 0:
@@ -171,7 +176,7 @@ def score_job(job_title, job_description, user_skills):
 # FUNCTION: WRITE COVER LETTER
 # -------------------------
 
-def write_cover_letter(job_title, job_description, cv_text, model):
+def write_cover_letter(job_title, job_description, cv_text, client):
 
     # ask Gemini to write a cover letter
     prompt = f"""
@@ -191,7 +196,11 @@ def write_cover_letter(job_title, job_description, cv_text, model):
     - Make it specific to this exact job
     """
 
-    response = model.generate_content(prompt)
+    # send to Gemini using new SDK
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt
+    )
 
     return response.text
 
@@ -207,9 +216,8 @@ if search_button:
         st.error("API keys missing - check Streamlit secrets")
         st.stop()
 
-    # start Gemini
-    genai.configure(api_key=gemini_key)
-    model = genai.GenerativeModel("gemini-3.5-flash")
+    # start Gemini client using new SDK
+    client = genai.Client(api_key=gemini_key)
 
     # ---- STEP 1: READ CV ----
 
@@ -224,7 +232,7 @@ if search_button:
         cv_text = read_cv(cv_file)
 
         # ask Gemini to find skills in the CV
-        cv_skills = get_cv_skills(cv_text, model)
+        cv_skills = get_cv_skills(cv_text, client)
 
         st.success(f"✅ CV read — found {len(cv_skills)} skills")
 
@@ -356,11 +364,12 @@ if search_button:
 
                 with st.spinner("✍️ Writing your cover letter..."):
 
+                    # pass client instead of model
                     letter = write_cover_letter(
                         row["title"],
                         row["description"],
                         cv_text,
-                        model
+                        client
                     )
 
                     st.text_area(
