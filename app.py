@@ -101,7 +101,7 @@ def get_cv_skills(cv_text, client):
 
     # send to Gemini using new SDK
     response = client.models.generate_content(
-        model="gemini-3.6-flash",
+        model="gemini-2.0-flash-001",
         contents=prompt
     )
 
