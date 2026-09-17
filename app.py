@@ -87,7 +87,7 @@ def get_cv_skills(cv_text, client):
     """
 
     response = client.models.generate_content(
-        model="gemini-3.7-flash",
+        model="gemini-3.8-flash",
         contents=prompt
     )
 
@@ -167,7 +167,7 @@ def write_cover_letter(job_title, job_description, cv_text, client):
     """
 
     response = client.models.generate_content(
-        model="gemini-3.7-flash",
+        model="gemini-3.8-flash",
         contents=prompt
     )
 
