@@ -298,17 +298,43 @@ if search_button:
             st.markdown("[View Full Job →](" + row["link"] + ")")
             st.divider()
 
-            if st.button("✉️ Generate Cover Letter", key="btn_" + str(i)):
+                        if st.button("✉️ Generate Cover Letter", key="btn_" + str(i)):
 
-                with st.spinner("✍️ Writing your cover letter..."):
+                # try up to 3 times if server is busy
+                letter = None
 
-                    letter = write_cover_letter(
-                        row["title"],
-                        row["description"],
-                        cv_text,
-                        client
-                    )
+                for attempt in range(3):
 
+                    try:
+
+                        with st.spinner("✍️ Writing cover letter..."):
+
+                            letter = write_cover_letter(
+                                row["title"],
+                                row["description"],
+                                cv_text,
+                                client
+                            )
+
+                        # worked - stop trying
+                        break
+
+                    except Exception:
+
+                        if attempt < 2:
+
+                            # wait 3 seconds then try again
+                            import time
+                            time.sleep(3)
+
+                        else:
+
+                            st.error("Server busy - please try again in a minute")
+
+                # only show letter if we got one
+                if letter:
+
+                    # show letter in text box
                     st.text_area(
                         "Your cover letter:",
                         letter,
@@ -316,9 +342,36 @@ if search_button:
                         key="letter_" + str(i)
                     )
 
+                    # create a word document
+                    from docx import Document
+
+                    # make a new empty word doc
+                    doc = Document()
+
+                    # add a title
+                    doc.add_heading("Cover Letter", 0)
+
+                    # add the job title
+                    doc.add_heading(row["title"], level=2)
+
+                    # add each paragraph of the letter
+                    for paragraph in letter.split("\n"):
+
+                        # only add if paragraph has text
+                        if paragraph.strip():
+                            doc.add_paragraph(paragraph)
+
+                    # save doc to a bytes buffer (like saving to memory)
+                    import io
+                    buffer = io.BytesIO()
+                    doc.save(buffer)
+                    buffer.seek(0)
+
+                    # show download button
                     st.download_button(
-                        "⬇️ Download Cover Letter",
-                        letter,
-                        file_name="cover_letter_" + str(i+1) + ".txt",
+                        label="⬇️ Download as Word Document",
+                        data=buffer,
+                        file_name="cover_letter_" + str(i+1) + ".docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         key="download_" + str(i)
                     )
