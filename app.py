@@ -96,7 +96,7 @@ def get_cv_skills(cv_text, client):
     Example: python, sql, pandas, power bi, machine learning
 
     CV:
-    {cv_text}
+    {cv_text[:3000]}
     """
 
     # send to Gemini using new SDK
