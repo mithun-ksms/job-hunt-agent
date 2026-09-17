@@ -298,7 +298,7 @@ if search_button:
             st.markdown("[View Full Job →](" + row["link"] + ")")
             st.divider()
 
-                        if st.button("✉️ Generate Cover Letter", key="btn_" + str(i)):
+        if st.button("✉️ Generate Cover Letter", key="btn_" + str(i)):
 
                 # try up to 3 times if server is busy
                 letter = None
