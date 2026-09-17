@@ -3,3 +3,4 @@ pandas
 requests
 google-genai
 pdfplumber
+python-docx
